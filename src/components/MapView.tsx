@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth-context";
 import { SmokeMarker } from "@/types";
 import { compressImage } from "@/lib/compress-image";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
+import { notifyZoneCapture } from "@/lib/notify-zone-capture";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADIUS_BASE = 75;
@@ -369,6 +370,13 @@ function MapInteraction({
             );
           }
         });
+        notifyZoneCapture(
+          latitude,
+          longitude,
+          user!.id,
+          profile?.team_id || null,
+          profile?.teams?.name || null
+        );
       }
       setAdding(false);
       setPendingLocation(null);
@@ -553,24 +561,50 @@ export default function MapView() {
                               className="w-full h-24 object-cover rounded-lg mb-1"
                             />
                           )}
-                          <a
-                            href={`/user/${m.user_id}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.location.href = `/user/${m.user_id}`;
-                            }}
-                            style={{
-                              color: "#047857",
-                              fontWeight: 600,
-                              textDecoration: "underline",
-                              cursor: "pointer",
-                            }}
-                          >
-                            {m.profiles?.display_name || "Anonim"}
-                          </a>
+                          <div className="flex items-center justify-between">
+                            <a
+                              href={`/user/${m.user_id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/user/${m.user_id}`;
+                              }}
+                              style={{
+                                color: "#047857",
+                                fontWeight: 600,
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {m.profiles?.display_name || "Anonim"}
+                            </a>
+                            {m.user_id === user?.id && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm("Bu sigara silinsin mi?")) return;
+                                  await supabase
+                                    .from("smoke_markers")
+                                    .delete()
+                                    .eq("id", m.id);
+                                  await supabase.rpc("decrement_smoke_count", { uid: user!.id });
+                                  window.dispatchEvent(new Event("marker-added"));
+                                }}
+                                style={{
+                                  color: "#ef4444",
+                                  fontSize: "11px",
+                                  cursor: "pointer",
+                                  background: "none",
+                                  border: "none",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Sil
+                              </button>
+                            )}
+                          </div>
                           {m.teams && (
                             <span
-                              className="text-xs ml-2"
+                              className="text-xs"
                               style={{ color: m.teams.color }}
                             >
                               {m.teams.name}
