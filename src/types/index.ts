@@ -12,6 +12,7 @@ export interface Profile {
   username: string;
   display_name: string;
   avatar_url: string | null;
+  friend_code: string | null;
   team_id: string | null;
   total_smokes: number;
   created_at: string;

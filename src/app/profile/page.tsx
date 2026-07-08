@@ -132,7 +132,7 @@ export default function ProfilePage() {
     <div className="h-full bg-slate-50 overflow-y-auto">
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between">
-        <Link href="/map" className="text-orange-500 font-medium text-sm">
+        <Link href="/map" className="text-emerald-600 font-medium text-sm">
           ← Harita
         </Link>
         <h1 className="font-bold text-slate-800">Profil</h1>
@@ -158,14 +158,14 @@ export default function ProfilePage() {
               <img
                 src={profile.avatar_url}
                 alt="Profil"
-                className="w-20 h-20 rounded-full object-cover border-2 border-orange-200"
+                className="w-20 h-20 rounded-full object-cover border-2 border-emerald-200"
               />
             ) : (
-              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-2xl">
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold text-2xl">
                 {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
               </div>
             )}
-            <div className="absolute bottom-0 right-0 bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow">
+            <div className="absolute bottom-0 right-0 bg-emerald-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow">
               {uploading ? "..." : "+"}
             </div>
           </button>
@@ -211,7 +211,7 @@ export default function ProfilePage() {
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
-      <p className="text-2xl font-bold text-orange-500">{value}</p>
+      <p className="text-2xl font-bold text-emerald-600">{value}</p>
       <p className="text-xs text-slate-500 mt-1">{label}</p>
     </div>
   );

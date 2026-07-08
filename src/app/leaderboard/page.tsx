@@ -107,7 +107,7 @@ export default function LeaderboardPage() {
     <div className="h-full bg-slate-50 overflow-y-auto">
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between">
-        <Link href="/map" className="text-orange-500 font-medium text-sm">
+        <Link href="/map" className="text-emerald-600 font-medium text-sm">
           ← Harita
         </Link>
         <h1 className="font-bold text-slate-800">Liderlik Tablosu</h1>
@@ -120,7 +120,7 @@ export default function LeaderboardPage() {
           onClick={() => setTab("all")}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
             tab === "all"
-              ? "bg-orange-500 text-white"
+              ? "bg-emerald-600 text-white"
               : "bg-white text-slate-600 border border-slate-200"
           }`}
         >
@@ -130,7 +130,7 @@ export default function LeaderboardPage() {
           onClick={() => setTab("weekly")}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
             tab === "weekly"
-              ? "bg-orange-500 text-white"
+              ? "bg-emerald-600 text-white"
               : "bg-white text-slate-600 border border-slate-200"
           }`}
         >
@@ -148,6 +148,7 @@ export default function LeaderboardPage() {
           allTime.map((entry, i) => (
             <LeaderRow
               key={entry.id}
+              userId={entry.id}
               rank={i + 1}
               displayName={entry.display_name}
               username={entry.username}
@@ -162,6 +163,7 @@ export default function LeaderboardPage() {
           weekly.map((entry, i) => (
             <LeaderRow
               key={entry.user_id}
+              userId={entry.user_id}
               rank={i + 1}
               displayName={entry.display_name}
               username={entry.username}
@@ -187,6 +189,7 @@ export default function LeaderboardPage() {
 }
 
 function LeaderRow({
+  userId,
   rank,
   displayName,
   username,
@@ -196,6 +199,7 @@ function LeaderRow({
   teamName,
   isMe,
 }: {
+  userId: string;
   rank: number;
   displayName: string;
   username: string;
@@ -209,10 +213,11 @@ function LeaderRow({
   const medal = medals[rank] || "";
 
   return (
-    <div
+    <a
+      href={`/user/${userId}`}
       className={`flex items-center gap-3 bg-white rounded-xl p-3 border shadow-sm ${
-        isMe ? "border-orange-300 bg-orange-50" : "border-slate-100"
-      }`}
+        isMe ? "border-emerald-300 bg-emerald-50" : "border-slate-100"
+      } hover:border-emerald-200 transition-colors`}
     >
       <div className="w-8 text-center">
         {medal ? (
@@ -229,7 +234,7 @@ function LeaderRow({
           className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
         />
       ) : (
-        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0">
+        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold text-sm flex-shrink-0">
           {displayName.charAt(0).toUpperCase()}
         </div>
       )}
@@ -251,9 +256,9 @@ function LeaderRow({
       </div>
 
       <div className="text-right">
-        <p className="text-lg font-bold text-orange-500">{count}</p>
+        <p className="text-lg font-bold text-emerald-600">{count}</p>
         <p className="text-[10px] text-slate-400">sigara</p>
       </div>
-    </div>
+    </a>
   );
 }

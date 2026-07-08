@@ -45,7 +45,7 @@ export default function LoginPage() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               required
             />
           </div>
@@ -55,7 +55,7 @@ export default function LoginPage() {
               placeholder="Sifre"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               required
             />
           </div>
@@ -67,7 +67,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
           >
             {loading ? "Giris yapiliyor..." : "Giris Yap"}
           </button>
@@ -75,7 +75,7 @@ export default function LoginPage() {
 
         <p className="text-center mt-6 text-slate-500 text-sm">
           Hesabin yok mu?{" "}
-          <Link href="/register" className="text-orange-500 font-medium">
+          <Link href="/register" className="text-emerald-600 font-medium">
             Kayit Ol
           </Link>
         </p>

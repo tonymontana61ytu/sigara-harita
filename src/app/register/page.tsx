@@ -49,11 +49,13 @@ export default function RegisterPage() {
     }
 
     if (data.user) {
+      const friendCode = data.user.id.replace(/-/g, "").substring(0, 6).toUpperCase();
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         username: username.toLowerCase(),
         display_name: displayName,
         total_smokes: 0,
+        friend_code: friendCode,
       });
 
       if (profileError) {
@@ -81,7 +83,7 @@ export default function RegisterPage() {
               placeholder="Kullanici Adi"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               required
             />
           </div>
@@ -91,7 +93,7 @@ export default function RegisterPage() {
               placeholder="Gorunen Isim"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               required
             />
           </div>
@@ -101,7 +103,7 @@ export default function RegisterPage() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               required
             />
           </div>
@@ -112,7 +114,7 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={6}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               required
             />
           </div>
@@ -124,7 +126,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
           >
             {loading ? "Kayit yapiliyor..." : "Kayit Ol"}
           </button>
@@ -132,7 +134,7 @@ export default function RegisterPage() {
 
         <p className="text-center mt-6 text-slate-500 text-sm">
           Zaten hesabin var mi?{" "}
-          <Link href="/login" className="text-orange-500 font-medium">
+          <Link href="/login" className="text-emerald-600 font-medium">
             Giris Yap
           </Link>
         </p>

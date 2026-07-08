@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -14,9 +14,11 @@ import L from "leaflet";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { SmokeMarker } from "@/types";
+import { compressImage } from "@/lib/compress-image";
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 import "leaflet/dist/leaflet.css";
 
-const ZONE_RADIUS_BASE = 75; // metre (yakin zoom)
+const ZONE_RADIUS_BASE = 75;
 
 function getZoneRadius(zoom: number): number {
   if (zoom >= 16) return ZONE_RADIUS_BASE;
@@ -26,10 +28,13 @@ function getZoneRadius(zoom: number): number {
   return 3000;
 }
 
-function createSmokeIcon(teamColor?: string | null) {
-  const color = teamColor || "#f97316";
+function createSmokeIcon(teamColor?: string | null, hasPhoto?: boolean) {
+  const color = teamColor || "#059669";
+  const photoIndicator = hasPhoto
+    ? `<div style="position:absolute;top:-2px;right:-2px;background:#fff;border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 1px 3px rgba(0,0,0,0.3);">📷</div>`
+    : "";
   return new L.DivIcon({
-    html: `<div style="font-size: 24px; text-align: center; line-height: 1; background: ${color}; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🚬</div>`,
+    html: `<div style="position:relative;font-size: 24px; text-align: center; line-height: 1; background: ${color}; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🚬${photoIndicator}</div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
     className: "",
@@ -105,7 +110,11 @@ function computeZones(markers: SmokeMarker[]): ZoneData[] {
   return zones;
 }
 
-function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
+function ZoomTracker({
+  onZoomChange,
+}: {
+  onZoomChange: (zoom: number) => void;
+}) {
   const map = useMap();
   useMapEvents({
     zoomend() {
@@ -116,6 +125,59 @@ function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void })
     onZoomChange(map.getZoom());
   }, []);
   return null;
+}
+
+const userLocationIcon = new L.DivIcon({
+  html: `<div style="width:16px;height:16px;background:#3b82f6;border-radius:50%;border:3px solid white;box-shadow:0 0 0 2px #3b82f6, 0 2px 6px rgba(0,0,0,0.3);"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+  className: "",
+});
+
+function UserLocation() {
+  const [position, setPosition] = useState<[number, number] | null>(null);
+  const map = useMap();
+
+  useEffect(() => {
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setPosition([pos.coords.latitude, pos.coords.longitude]);
+      },
+      () => {},
+      { enableHighAccuracy: true }
+    );
+
+    const flyHandler = (e: Event) => {
+      const { lat, lng } = (e as CustomEvent).detail;
+      map.flyTo([lat, lng], 16);
+    };
+    window.addEventListener("fly-to-location", flyHandler);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      window.removeEventListener("fly-to-location", flyHandler);
+    };
+  }, [map]);
+
+  if (!position) return null;
+
+  return (
+    <>
+      <Circle
+        center={position}
+        radius={30}
+        pathOptions={{
+          color: "#3b82f6",
+          fillColor: "#3b82f6",
+          fillOpacity: 0.1,
+          weight: 1,
+        }}
+      />
+      <Marker position={position} icon={userLocationIcon}>
+        <Popup>Buradasin</Popup>
+      </Marker>
+    </>
+  );
 }
 
 function MapClickHandler({
@@ -129,6 +191,94 @@ function MapClickHandler({
     },
   });
   return null;
+}
+
+function PhotoModal({
+  markerId,
+  onDone,
+}: {
+  markerId: string;
+  onDone: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const filePath = `markers/${markerId}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, compressed, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        alert("Foto yuklenemedi: " + uploadError.message);
+        setUploading(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      await supabase
+        .from("smoke_markers")
+        .update({ photo_url: urlData.publicUrl })
+        .eq("id", markerId);
+
+      window.dispatchEvent(new Event("marker-added"));
+      onDone();
+    } catch {
+      alert("Bir hata olustu");
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-[2000] bg-black/50 flex items-end justify-center p-4">
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">
+        <p className="text-center font-semibold text-slate-800 mb-1">
+          Sigara eklendi!
+        </p>
+        <p className="text-center text-sm text-slate-500 mb-4">
+          Fotograf eklemek ister misin?
+        </p>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFile}
+          className="hidden"
+        />
+
+        <div className="flex gap-3">
+          <button
+            onClick={onDone}
+            className="flex-1 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl active:scale-95 transition-all"
+          >
+            Gec
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50"
+          >
+            {uploading ? "Yukleniyor..." : "📷 Foto Ekle"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ActionButtons({
@@ -156,7 +306,7 @@ function ActionButtons({
         <button
           onClick={onConfirm}
           disabled={adding}
-          className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full shadow-lg active:scale-95 transition-all disabled:opacity-50"
+          className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full shadow-lg active:scale-95 transition-all disabled:opacity-50"
         >
           {adding ? "Ekleniyor..." : "Onayla"}
         </button>
@@ -169,7 +319,7 @@ function ActionButtons({
       <button
         onClick={onGPS}
         disabled={adding}
-        className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50"
+        className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50"
       >
         {adding ? "Ekleniyor..." : "🚬 Konumuma Ekle"}
       </button>
@@ -177,27 +327,33 @@ function ActionButtons({
   );
 }
 
-function MapInteraction() {
+function MapInteraction({
+  onMarkerAdded,
+}: {
+  onMarkerAdded: (id: string) => void;
+}) {
   const map = useMap();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [adding, setAdding] = useState(false);
   const [pendingLocation, setPendingLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
 
-  const { profile } = useAuth();
-
   const addMarker = useCallback(
     async (latitude: number, longitude: number) => {
       setAdding(true);
-      const { error } = await supabase.from("smoke_markers").insert({
-        user_id: user!.id,
-        latitude,
-        longitude,
-        smoked_at: new Date().toISOString(),
-        team_id: profile?.team_id || null,
-      });
+      const { data, error } = await supabase
+        .from("smoke_markers")
+        .insert({
+          user_id: user!.id,
+          latitude,
+          longitude,
+          smoked_at: new Date().toISOString(),
+          team_id: profile?.team_id || null,
+        })
+        .select("id")
+        .single();
 
       if (error) {
         console.error("Marker eklenemedi:", error);
@@ -205,11 +361,19 @@ function MapInteraction() {
       } else {
         await supabase.rpc("increment_smoke_count", { uid: user!.id });
         window.dispatchEvent(new Event("marker-added"));
+        onMarkerAdded(data.id);
+        checkAndUnlockAchievements(user!.id).then((newOnes) => {
+          if (newOnes.length > 0) {
+            window.dispatchEvent(
+              new CustomEvent("achievement-unlocked", { detail: newOnes })
+            );
+          }
+        });
       }
       setAdding(false);
       setPendingLocation(null);
     },
-    [user, profile]
+    [user, profile, onMarkerAdded]
   );
 
   const handleGPS = () => {
@@ -269,6 +433,7 @@ function MapInteraction() {
 export default function MapView() {
   const [markers, setMarkers] = useState<SmokeMarker[]>([]);
   const [zoom, setZoom] = useState(12);
+  const [photoMarkerId, setPhotoMarkerId] = useState<string | null>(null);
   const { user } = useAuth();
 
   const fetchMarkers = async () => {
@@ -292,7 +457,7 @@ export default function MapView() {
       .channel("markers")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "smoke_markers" },
+        { event: "*", schema: "public", table: "smoke_markers" },
         () => fetchMarkers()
       )
       .subscribe();
@@ -304,6 +469,7 @@ export default function MapView() {
   }, []);
 
   const zones = useMemo(() => computeZones(markers), [markers]);
+
 
   return (
     <div className="relative h-full w-full">
@@ -319,8 +485,8 @@ export default function MapView() {
         />
 
         <ZoomTracker onZoomChange={setZoom} />
+        <UserLocation />
 
-        {/* Takım bölgeleri - yarıçap daireler */}
         {zones.map((zone, i) => (
           <Circle
             key={`zone-${i}-${zoom}`}
@@ -333,62 +499,132 @@ export default function MapView() {
               weight: 2,
               opacity: 0.6,
             }}
-          >
-            <Popup>
-              <div className="text-sm">
-                <p className="font-semibold" style={{ color: zone.color }}>
-                  {zone.teamName}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Son icen: {zone.lastUser}
-                </p>
-              </div>
-            </Popup>
-          </Circle>
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e.originalEvent);
+              },
+            }}
+            interactive={false}
+          />
         ))}
 
-        {/* Sigara marker'ları */}
         {markers.map((marker) => (
           <Marker
             key={marker.id}
             position={[marker.latitude, marker.longitude]}
-            icon={createSmokeIcon(marker.teams?.color)}
+            icon={createSmokeIcon(marker.teams?.color, !!marker.photo_url)}
           >
             <Popup>
-              <div className="text-sm">
-                <p className="font-semibold">
-                  {marker.profiles?.display_name || "Anonim"}
-                </p>
-                <p className="text-slate-500">
-                  @{marker.profiles?.username || "?"}
-                </p>
-                {marker.teams && (
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: marker.teams.color }}
-                  >
-                    {marker.teams.name}
-                  </p>
-                )}
-                <p className="mt-1 text-xs text-slate-400">
-                  {new Date(marker.smoked_at).toLocaleDateString("tr-TR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}{" "}
-                  -{" "}
-                  {new Date(marker.smoked_at).toLocaleTimeString("tr-TR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
+              <div className="text-sm max-w-[220px] max-h-[300px] overflow-y-auto">
+                {(() => {
+                  const nearby = markers.filter(
+                    (m) =>
+                      getDistance(
+                        marker.latitude,
+                        marker.longitude,
+                        m.latitude,
+                        m.longitude
+                      ) < ZONE_RADIUS_BASE
+                  ).sort(
+                    (a, b) =>
+                      new Date(b.smoked_at).getTime() -
+                      new Date(a.smoked_at).getTime()
+                  );
+                  return (
+                    <>
+                      {nearby.length > 1 && (
+                        <p className="text-xs text-slate-400 mb-2 font-medium">
+                          Bu bolgede {nearby.length} sigara
+                        </p>
+                      )}
+                      {nearby.map((m, idx) => (
+                        <div
+                          key={m.id}
+                          className={
+                            idx > 0
+                              ? "border-t border-slate-100 pt-2 mt-2"
+                              : ""
+                          }
+                        >
+                          {m.photo_url && (
+                            <img
+                              src={m.photo_url}
+                              alt="Sigara fotografi"
+                              className="w-full h-24 object-cover rounded-lg mb-1"
+                            />
+                          )}
+                          <a
+                            href={`/user/${m.user_id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/user/${m.user_id}`;
+                            }}
+                            style={{
+                              color: "#047857",
+                              fontWeight: 600,
+                              textDecoration: "underline",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {m.profiles?.display_name || "Anonim"}
+                          </a>
+                          {m.teams && (
+                            <span
+                              className="text-xs ml-2"
+                              style={{ color: m.teams.color }}
+                            >
+                              {m.teams.name}
+                            </span>
+                          )}
+                          <p className="text-xs text-slate-400">
+                            {new Date(m.smoked_at).toLocaleDateString("tr-TR", {
+                              day: "numeric",
+                              month: "short",
+                            })}{" "}
+                            {new Date(m.smoked_at).toLocaleTimeString("tr-TR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </>
+                  );
+                })()}
               </div>
             </Popup>
           </Marker>
         ))}
 
-        {user && <MapInteraction />}
+        {user && <MapInteraction onMarkerAdded={(id) => setPhotoMarkerId(id)} />}
       </MapContainer>
+
+      {/* Konumuma git butonu */}
+      <button
+        onClick={() => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              window.dispatchEvent(
+                new CustomEvent("fly-to-location", {
+                  detail: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+                })
+              );
+            },
+            () => {}
+          );
+        }}
+        className="absolute top-4 right-4 z-[1000] bg-white w-10 h-10 rounded-full shadow-lg flex items-center justify-center text-blue-500 hover:bg-blue-50 transition-colors border border-slate-200"
+        title="Konumuma git"
+      >
+        📍
+      </button>
+
+      {photoMarkerId && (
+        <PhotoModal
+          markerId={photoMarkerId}
+          onDone={() => setPhotoMarkerId(null)}
+        />
+      )}
 
       {!user && (
         <div className="absolute top-4 left-4 right-4 z-[1000] bg-white/90 backdrop-blur rounded-xl p-3 text-center text-sm text-slate-600 shadow">
