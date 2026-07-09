@@ -297,7 +297,12 @@ function ActionButtons({
 }) {
   if (pendingLocation) {
     return (
-      <div className="absolute bottom-6 left-4 right-4 z-[1000] flex gap-3">
+      <div
+        className="absolute bottom-6 left-4 right-4 z-[1000] flex gap-3"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onCancel}
           className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 font-semibold rounded-full shadow-lg active:scale-95 transition-all"
@@ -401,6 +406,7 @@ function MapInteraction({
   };
 
   const handleMapClick = (lat: number, lng: number) => {
+    if (pendingLocation) return;
     setPendingLocation({ lat, lng });
   };
 
